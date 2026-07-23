@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model KnowledgeCategory {
+  id        Int         @id @default(autoincrement())
+  name      String      @unique
+  knowledge Knowledge[]
+
+  @@map("knowledge_categories")
+}
+
+model Knowledge {
+  id         Int               @id @default(autoincrement())
+  categoryId Int
+  title      String
+  content    String
+  category   KnowledgeCategory @relation(fields: [categoryId], references: [id])
+  keywords   KnowledgeKeyword[]
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@map("knowledge")
+}
+
+model KnowledgeKeyword {
+  id          Int       @id @default(autoincrement())
+  knowledgeId Int
+  keyword     String
+  knowledge   Knowledge @relation(fields: [knowledgeId], references: [id], onDelete: Cascade)
+
+  @@index([keyword])
+  @@map("knowledge_keywords")
+}
+
+model ConversationSession {
+  phone     String   @id
+  step      String?
+  context   Json?
+  updatedAt DateTime @updatedAt
+
+  @@map("conversation_sessions")
+}
