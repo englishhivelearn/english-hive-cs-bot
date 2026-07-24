@@ -5,7 +5,8 @@ const {
   fetchLatestBaileysVersion,
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
-const qrcode = require('qrcode-terminal');
+const QRCode = require('qrcode');
+const http = require('http');
 
 const { getSession } = require('../lib/sessionManager');
 const { isFlowTrigger, startFlow, continueFlow } = require('../lib/conversationFlow');
@@ -14,6 +15,74 @@ const { findBestAnswer, CONFIDENCE_THRESHOLD } = require('../lib/knowledgeEngine
 // PENTING: arahkan folder ini ke Railway Volume (lihat README) supaya
 // sesi login WhatsApp tidak hilang setiap kali service di-redeploy.
 const AUTH_FOLDER = process.env.BAILEYS_AUTH_DIR || './auth_info';
+
+// Railway selalu inject PORT otomatis. JANGAN di-override manual di Variables.
+const PORT = process.env.PORT || 3000;
+
+let latestQR = null;
+let isConnected = false;
+
+// Halaman web khusus untuk menampilkan QR sebagai gambar asli
+// (jauh lebih gampang discan daripada ASCII QR di terminal log Railway).
+function startQrServer() {
+  const server = http.createServer(async (req, res) => {
+    if (isConnected) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(`
+        <html>
+          <body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#f0fdf4">
+            <h2 style="color:#166534">✅ Bot WhatsApp sudah tersambung. Tidak perlu scan QR lagi.</h2>
+          </body>
+        </html>
+      `);
+    }
+
+    if (!latestQR) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(`
+        <html>
+          <head><meta http-equiv="refresh" content="5"></head>
+          <body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif">
+            <h2>Menyiapkan QR code... halaman ini auto-refresh tiap 5 detik.</h2>
+          </body>
+        </html>
+      `);
+    }
+
+    try {
+      const qrImage = await QRCode.toDataURL(latestQR, { width: 400, margin: 2 });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(`
+        <html>
+          <head>
+            <meta http-equiv="refresh" content="20">
+            <title>Scan QR - English Hive Bot</title>
+          </head>
+          <body style="display:flex;flex-direction:column;align-items:center;font-family:sans-serif;margin-top:40px;background:#fafafa">
+            <h2>Scan QR ini dengan WhatsApp</h2>
+            <p>Setelan → Perangkat Tertaut → Tautkan Perangkat</p>
+            <img src="${qrImage}" width="400" height="400" style="border:8px solid white;box-shadow:0 2px 12px rgba(0,0,0,0.1);border-radius:8px" />
+            <p style="color:#666;margin-top:16px">Halaman auto-refresh tiap 20 detik selama QR belum discan.</p>
+          </body>
+        </html>
+      `);
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Gagal generate QR image: ' + err.message);
+    }
+  });
+
+  server.on('error', (err) => {
+    console.error('❌ QR web server gagal jalan:', err.message);
+  });
+
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log('==================================================');
+    console.log(`  QR web server AKTIF di port ${PORT}`);
+    console.log('  Buka domain publik service ini untuk lihat QR.');
+    console.log('==================================================');
+  });
+}
 
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
@@ -30,16 +99,20 @@ async function startBot() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      console.log('Scan QR ini dengan WhatsApp (Linked Devices):');
-      qrcode.generate(qr, { small: true });
+      latestQR = qr;
+      isConnected = false;
+      console.log('QR code baru diterima. Buka halaman web service ini untuk scan.');
     }
 
     if (connection === 'close') {
+      isConnected = false;
       const shouldReconnect =
         lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
       console.log('Koneksi terputus, reconnect:', shouldReconnect);
       if (shouldReconnect) startBot();
     } else if (connection === 'open') {
+      isConnected = true;
+      latestQR = null;
       console.log('✅ Bot WhatsApp English Hive tersambung!');
     }
   });
@@ -102,6 +175,7 @@ async function processMessage(phone, rawText) {
   return match.content;
 }
 
+startQrServer();
 startBot();
 
 module.exports = { startBot, processMessage };
