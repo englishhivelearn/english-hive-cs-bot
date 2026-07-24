@@ -1,6 +1,6 @@
-const prisma = require('../../../lib/prisma');
+import prisma from '../../../lib/prisma';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method === 'GET') {
     const data = await prisma.knowledge.findMany({
       include: { category: true, keywords: true },
@@ -35,4 +35,4 @@ module.exports = async function handler(req, res) {
 
   res.setHeader('Allow', ['GET', 'POST']);
   return res.status(405).end(`Method ${req.method} tidak diizinkan`);
-};
+}

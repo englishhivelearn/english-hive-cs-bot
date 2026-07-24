@@ -1,6 +1,6 @@
-const prisma = require('../../../lib/prisma');
+import prisma from '../../../lib/prisma';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   const id = Number(req.query.id);
 
   if (req.method === 'GET') {
@@ -42,4 +42,4 @@ module.exports = async function handler(req, res) {
 
   res.setHeader('Allow', ['GET', 'PUT', 'DELETE']);
   return res.status(405).end(`Method ${req.method} tidak diizinkan`);
-};
+}
