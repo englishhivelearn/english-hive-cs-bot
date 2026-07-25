@@ -125,6 +125,11 @@ async function startBot() {
     if (!msg.message || msg.key.fromMe) return;
 
     const phone = msg.key.remoteJid;
+
+    // Skip pesan dari grup — JID grup WhatsApp selalu berakhiran "@g.us".
+    // Chat pribadi berakhiran "@s.whatsapp.net".
+    if (phone.endsWith('@g.us')) return;
+
     const text =
       msg.message.conversation ||
       msg.message.extendedTextMessage?.text ||
