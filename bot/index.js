@@ -170,11 +170,8 @@ async function processMessage(phone, rawText) {
   const { match, confidence } = await findBestAnswer(text);
 
   if (!match || confidence < CONFIDENCE_THRESHOLD) {
-    return (
-      'Maaf, saya belum menemukan jawaban yang pas untuk pertanyaan itu. ' +
-      'Pesan kamu sudah kami teruskan ke admin, mohon ditunggu ya 🙏\n\n' +
-      '(Ketik "trial" untuk daftar trial class gratis)'
-    );
+    // Tidak ada jawaban yang cukup yakin -> bot diam, tidak balas apa-apa.
+    return null;
   }
 
   return match.content;
