@@ -175,32 +175,29 @@ async function processMessage(phone, rawText) {
 
   const { match, confidence, ambiguous } = await findBestAnswer(text);
 
-  if (!match || confidence < CONFIDENCE_THRESHOLD) {
-    return (
-      'Maaf, saya belum menemukan jawaban yang pas untuk pertanyaan itu. ' +
-      'Pesan kamu sudah kami teruskan ke admin, mohon ditunggu ya 🙏\n\n' +
-      '(Ketik "trial" untuk daftar trial class gratis)'
-    );
-  }
-
-  // Kalau bot ragu antara 2 knowledge yang mirip, tanya balik dulu
-  // daripada asal jawab yang belum tentu sesuai maksud user.
-  if (ambiguous) {
-    const options = ambiguous.map((k, i) => `${i + 1}. ${k.title}`).join('\n');
-    return (
-      `Maksud kamu yang mana ya? 🙏\n\n${options}\n\n` +
-      'Coba tulis ulang pertanyaannya lebih spesifik ya, biar aku bisa bantu dengan tepat.'
-    );
+  // Tidak yakin / tidak ketemu / ambigu -> diam sama sekali, tidak kirim apa-apa.
+  if (!match || confidence < CONFIDENCE_THRESHOLD || ambiguous) {
+    return null;
   }
 
   return match.content;
+}
+
+// Lacak nomor mana saja yang SUDAH dikasih notice jam operasional hari ini,
+// supaya tidak dikirim berulang-ulang tiap pesan. Reset otomatis tiap
+// ganti hari (key-nya termasuk tanggal).
+const notifiedOutOfHours = new Map(); // phone -> "YYYY-MM-DD" (tanggal WITA terakhir dinotif)
+
+function getTodayWITA() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Makassar' }).format(new Date());
 }
 
 /**
  * Bungkus reply dengan notice jam operasional kalau perlu.
  * Bot tetap otomatis jawab FAQ 24 jam (nilai jual utamanya), tapi
  * user diberi tahu bahwa follow-up manual dari admin baru akan
- * direspon saat jam kerja.
+ * direspon saat jam kerja -- notice ini cuma dikirim SEKALI per nomor
+ * per hari, tidak diulang-ulang tiap pesan.
  */
 async function processMessageWithHoursNotice(phone, rawText) {
   const reply = await processMessage(phone, rawText);
@@ -208,7 +205,13 @@ async function processMessageWithHoursNotice(phone, rawText) {
   if (!reply) return reply; // tetap diam kalau memang tidak ada jawaban
 
   if (!isWithinOperatingHours()) {
-    return `${reply}\n\n${getOutOfHoursNotice()}`;
+    const today = getTodayWITA();
+    const alreadyNotified = notifiedOutOfHours.get(phone) === today;
+
+    if (!alreadyNotified) {
+      notifiedOutOfHours.set(phone, today);
+      return `${reply}\n\n${getOutOfHoursNotice()}`;
+    }
   }
 
   return reply;
