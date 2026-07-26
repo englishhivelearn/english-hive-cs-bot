@@ -137,10 +137,15 @@ async function startBot() {
 
     if (!text) return;
 
+    console.log(`📩 Pesan masuk dari ${phone}: "${text}"`);
+
     try {
       const reply = await processMessage(phone, text);
       if (reply) {
+        console.log(`📤 Membalas: "${reply.slice(0, 80)}..."`);
         await sock.sendMessage(phone, { text: reply });
+      } else {
+        console.log('⚠️ Tidak ada balasan (reply kosong/null).');
       }
     } catch (err) {
       console.error('Error memproses pesan:', err);
