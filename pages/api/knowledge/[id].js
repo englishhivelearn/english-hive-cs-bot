@@ -1,43 +1,45 @@
-import prisma from '../../../../lib/prisma';
+import prisma from '../../../lib/prisma';
 
 export default async function handler(req, res) {
   const id = Number(req.query.id);
 
-  if (req.method === 'PUT') {
-    const { name } = req.body;
-    if (!name || !name.trim()) {
-      return res.status(400).json({ error: 'name wajib diisi' });
-    }
+  if (req.method === 'GET') {
+    const item = await prisma.knowledge.findUnique({
+      where: { id },
+      include: { category: true, keywords: true },
+    });
+    if (!item) return res.status(404).json({ error: 'Tidak ditemukan' });
+    return res.status(200).json(item);
+  }
 
-    try {
-      const updated = await prisma.knowledgeCategory.update({
-        where: { id },
-        data: { name: name.trim() },
-      });
-      return res.status(200).json(updated);
-    } catch (err) {
-      if (err.code === 'P2002') {
-        return res.status(409).json({ error: 'Nama kategori sudah dipakai' });
-      }
-      return res.status(500).json({ error: 'Gagal update kategori' });
-    }
+  if (req.method === 'PUT') {
+    const { title, content, categoryId, keywords = [] } = req.body;
+
+    await prisma.knowledgeKeyword.deleteMany({ where: { knowledgeId: id } });
+
+    const updated = await prisma.knowledge.update({
+      where: { id },
+      data: {
+        title,
+        content,
+        categoryId: Number(categoryId),
+        keywords: {
+          create: keywords
+            .filter((k) => k && k.trim())
+            .map((k) => ({ keyword: k.trim().toLowerCase() })),
+        },
+      },
+      include: { keywords: true, category: true },
+    });
+
+    return res.status(200).json(updated);
   }
 
   if (req.method === 'DELETE') {
-    // Cek dulu apakah kategori ini masih dipakai oleh knowledge lain,
-    // supaya tidak menghapus kategori yang masih ada isinya tanpa sadar.
-    const usageCount = await prisma.knowledge.count({ where: { categoryId: id } });
-
-    if (usageCount > 0) {
-      return res.status(409).json({
-        error: `Kategori ini masih dipakai oleh ${usageCount} knowledge. Hapus/pindahkan knowledge itu dulu sebelum hapus kategori.`,
-      });
-    }
-
-    await prisma.knowledgeCategory.delete({ where: { id } });
+    await prisma.knowledge.delete({ where: { id } });
     return res.status(204).end();
   }
 
-  res.setHeader('Allow', ['PUT', 'DELETE']);
+  res.setHeader('Allow', ['GET', 'PUT', 'DELETE']);
   return res.status(405).end(`Method ${req.method} tidak diizinkan`);
 }
