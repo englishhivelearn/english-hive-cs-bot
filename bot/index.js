@@ -11,6 +11,7 @@ const http = require('http');
 const { getSession } = require('../lib/sessionManager');
 const { isFlowTrigger, startFlow, continueFlow } = require('../lib/conversationFlow');
 const { findBestAnswer, CONFIDENCE_THRESHOLD } = require('../lib/knowledgeEngine');
+const { isWithinOperatingHours, getOutOfHoursNotice } = require('../lib/businessHours');
 
 // PENTING: arahkan folder ini ke Railway Volume (lihat README) supaya
 // sesi login WhatsApp tidak hilang setiap kali service di-redeploy.
@@ -140,7 +141,7 @@ async function startBot() {
     console.log(`📩 Pesan masuk dari ${phone}: "${text}"`);
 
     try {
-      const reply = await processMessage(phone, text);
+      const reply = await processMessageWithHoursNotice(phone, text);
       if (reply) {
         console.log(`📤 Membalas: "${reply.slice(0, 80)}..."`);
         await sock.sendMessage(phone, { text: reply });
@@ -172,14 +173,45 @@ async function processMessage(phone, rawText) {
     return startFlow(phone, flowName);
   }
 
-  const { match, confidence } = await findBestAnswer(text);
+  const { match, confidence, ambiguous } = await findBestAnswer(text);
 
   if (!match || confidence < CONFIDENCE_THRESHOLD) {
-    // Tidak ada jawaban yang cukup yakin -> bot diam, tidak balas apa-apa.
-    return null;
+    return (
+      'Maaf, saya belum menemukan jawaban yang pas untuk pertanyaan itu. ' +
+      'Pesan kamu sudah kami teruskan ke admin, mohon ditunggu ya 🙏\n\n' +
+      '(Ketik "trial" untuk daftar trial class gratis)'
+    );
+  }
+
+  // Kalau bot ragu antara 2 knowledge yang mirip, tanya balik dulu
+  // daripada asal jawab yang belum tentu sesuai maksud user.
+  if (ambiguous) {
+    const options = ambiguous.map((k, i) => `${i + 1}. ${k.title}`).join('\n');
+    return (
+      `Maksud kamu yang mana ya? 🙏\n\n${options}\n\n` +
+      'Coba tulis ulang pertanyaannya lebih spesifik ya, biar aku bisa bantu dengan tepat.'
+    );
   }
 
   return match.content;
+}
+
+/**
+ * Bungkus reply dengan notice jam operasional kalau perlu.
+ * Bot tetap otomatis jawab FAQ 24 jam (nilai jual utamanya), tapi
+ * user diberi tahu bahwa follow-up manual dari admin baru akan
+ * direspon saat jam kerja.
+ */
+async function processMessageWithHoursNotice(phone, rawText) {
+  const reply = await processMessage(phone, rawText);
+
+  if (!reply) return reply; // tetap diam kalau memang tidak ada jawaban
+
+  if (!isWithinOperatingHours()) {
+    return `${reply}\n\n${getOutOfHoursNotice()}`;
+  }
+
+  return reply;
 }
 
 startQrServer();
