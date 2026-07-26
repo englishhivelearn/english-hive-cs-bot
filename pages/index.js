@@ -6,6 +6,8 @@ export default function AdminDashboard() {
   const [form, setForm] = useState({ title: '', content: '', categoryId: '', keywords: '' });
   const [editingId, setEditingId] = useState(null);
   const [newCategory, setNewCategory] = useState('');
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
 
   async function loadData() {
     const [kRes, cRes] = await Promise.all([
@@ -71,6 +73,50 @@ export default function AdminDashboard() {
     loadData();
   }
 
+  function startEditCategory(cat) {
+    setEditingCategoryId(cat.id);
+    setEditingCategoryName(cat.name);
+  }
+
+  function cancelEditCategory() {
+    setEditingCategoryId(null);
+    setEditingCategoryName('');
+  }
+
+  async function handleUpdateCategory(e) {
+    e.preventDefault();
+    if (!editingCategoryName.trim()) return;
+
+    const res = await fetch(`/api/knowledge/categories/${editingCategoryId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: editingCategoryName.trim() }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || 'Gagal update kategori');
+      return;
+    }
+
+    cancelEditCategory();
+    loadData();
+  }
+
+  async function handleDeleteCategory(cat) {
+    if (!confirm(`Hapus kategori "${cat.name}"?`)) return;
+
+    const res = await fetch(`/api/knowledge/categories/${cat.id}`, { method: 'DELETE' });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || 'Gagal hapus kategori');
+      return;
+    }
+
+    loadData();
+  }
+
   return (
     <div className="container">
       <h1>English Hive — Knowledge Base Admin</h1>
@@ -131,6 +177,34 @@ export default function AdminDashboard() {
           />
           <button type="submit">Tambah Kategori</button>
         </form>
+
+        <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid #eee' }} />
+
+        <h4 style={{ margin: '0 0 8px' }}>Daftar Kategori ({categories.length})</h4>
+        {categories.length === 0 && <p style={{ color: '#888' }}>Belum ada kategori.</p>}
+        {categories.map((cat) => (
+          <div className="list-item" key={cat.id}>
+            {editingCategoryId === cat.id ? (
+              <form onSubmit={handleUpdateCategory} style={{ flexDirection: 'row', flex: 1, gap: 8 }}>
+                <input
+                  value={editingCategoryName}
+                  onChange={(e) => setEditingCategoryName(e.target.value)}
+                  autoFocus
+                />
+                <button type="submit">Simpan</button>
+                <button type="button" className="secondary" onClick={cancelEditCategory}>Batal</button>
+              </form>
+            ) : (
+              <>
+                <strong>{cat.name}</strong>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="secondary" onClick={() => startEditCategory(cat)}>Edit</button>
+                  <button className="danger" onClick={() => handleDeleteCategory(cat)}>Hapus</button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
       </div>
 
       <div className="card">
