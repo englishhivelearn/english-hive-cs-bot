@@ -8,8 +8,6 @@ const pino = require('pino');
 const QRCode = require('qrcode');
 const http = require('http');
 
-const { getSession } = require('../lib/sessionManager');
-const { isFlowTrigger, startFlow, continueFlow } = require('../lib/conversationFlow');
 const { findBestAnswer, CONFIDENCE_THRESHOLD } = require('../lib/knowledgeEngine');
 const { isWithinOperatingHours, getOutOfHoursNotice } = require('../lib/businessHours');
 
@@ -162,16 +160,6 @@ async function startBot() {
 async function processMessage(phone, rawText) {
   const text = rawText.trim();
   if (!text) return null;
-
-  const session = await getSession(phone);
-  if (session && session.step) {
-    return continueFlow(phone, session, text);
-  }
-
-  const flowName = isFlowTrigger(text);
-  if (flowName) {
-    return startFlow(phone, flowName);
-  }
 
   const { match, confidence, ambiguous } = await findBestAnswer(text);
 
