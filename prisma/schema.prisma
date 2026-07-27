@@ -16,14 +16,25 @@ model KnowledgeCategory {
 }
 
 model Knowledge {
-  id         Int               @id @default(autoincrement())
-  categoryId Int
-  title      String
-  content    String
-  category   KnowledgeCategory @relation(fields: [categoryId], references: [id])
-  keywords   KnowledgeKeyword[]
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  id              Int                @id @default(autoincrement())
+  categoryId      Int
+  title           String
+  content         String
+  category        KnowledgeCategory  @relation(fields: [categoryId], references: [id])
+  keywords        KnowledgeKeyword[]
+  // Kombinasi kata WAJIB muncul bersamaan (AND-logic).
+  // Format: array of array of string, mis:
+  // [["jadwal","hari"], ["jadwal","jam"]]
+  // Match kalau SALAH SATU grup (OR antar-grup) semua kata di dalamnya
+  // (AND dalam grup) muncul di pesan user.
+  requiredGroups  Json?
+  // Kata yang kalau muncul di pesan user, knowledge ini di-SKIP total
+  // meski keyword/requiredGroups cocok. Format: array of string.
+  // Mis: ["pindah","ganti","reschedule"] untuk knowledge "Info Jadwal"
+  // supaya tidak salah nyantol ke pertanyaan reschedule.
+  excludeKeywords Json?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
   @@map("knowledge")
 }

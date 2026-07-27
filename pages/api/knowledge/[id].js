@@ -13,7 +13,14 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'PUT') {
-    const { title, content, categoryId, keywords = [] } = req.body;
+    const {
+      title,
+      content,
+      categoryId,
+      keywords = [],
+      requiredGroups = [],
+      excludeKeywords = [],
+    } = req.body;
 
     await prisma.knowledgeKeyword.deleteMany({ where: { knowledgeId: id } });
 
@@ -23,6 +30,8 @@ export default async function handler(req, res) {
         title,
         content,
         categoryId: Number(categoryId),
+        requiredGroups: requiredGroups.length ? requiredGroups : null,
+        excludeKeywords: excludeKeywords.length ? excludeKeywords : null,
         keywords: {
           create: keywords
             .filter((k) => k && k.trim())

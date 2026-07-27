@@ -10,7 +10,14 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { title, content, categoryId, keywords = [] } = req.body;
+    const {
+      title,
+      content,
+      categoryId,
+      keywords = [],
+      requiredGroups = [],
+      excludeKeywords = [],
+    } = req.body;
 
     if (!title || !content || !categoryId) {
       return res.status(400).json({ error: 'title, content, categoryId wajib diisi' });
@@ -21,6 +28,8 @@ export default async function handler(req, res) {
         title,
         content,
         categoryId: Number(categoryId),
+        requiredGroups: requiredGroups.length ? requiredGroups : null,
+        excludeKeywords: excludeKeywords.length ? excludeKeywords : null,
         keywords: {
           create: keywords
             .filter((k) => k && k.trim())
