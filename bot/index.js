@@ -142,6 +142,14 @@ async function startBot() {
       const reply = await processMessageWithHoursNotice(phone, text);
       if (reply) {
         console.log(`📤 Membalas: "${reply.slice(0, 80)}..."`);
+
+        // Gimmick: tunjukkan status "mengetik..." dan tunda 5 detik
+        // sebelum benar-benar membalas, biar terasa lebih natural
+        // (tidak instan seperti robot).
+        await sock.sendPresenceUpdate('composing', phone);
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        await sock.sendPresenceUpdate('paused', phone);
+
         await sock.sendMessage(phone, { text: reply });
       } else {
         console.log('⚠️ Tidak ada balasan (reply kosong/null).');
