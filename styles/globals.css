@@ -3,9 +3,9 @@
 :root {
   --ink: #1c1917;
   --ink-soft: #57534e;
-  --paper: #fdfaf5;
+  --paper: #f4f5f6;
   --card: #ffffff;
-  --line: #e7e1d6;
+  --line: #e2e4e7;
   --honey: #16a34a;
   --honey-dark: #15803d;
   --honey-soft: #ecfdf3;
@@ -25,7 +25,7 @@ body {
   background: var(--paper);
   color: var(--ink);
   background-image:
-    radial-gradient(circle at 1px 1px, #d1e7d5 1px, transparent 0);
+    radial-gradient(circle at 1px 1px, #dcdfe3 1px, transparent 0);
   background-size: 28px 28px;
 }
 
