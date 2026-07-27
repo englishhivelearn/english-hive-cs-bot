@@ -211,6 +211,7 @@ button.danger:hover { background: #fecaca; }
 
 /* ---------- Knowledge list items ---------- */
 .k-item {
+  background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 16px;
