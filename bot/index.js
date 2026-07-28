@@ -8,8 +8,8 @@ const pino = require('pino');
 const QRCode = require('qrcode');
 const http = require('http');
 
-const { findBestAnswer, CONFIDENCE_THRESHOLD } = require('../lib/knowledgeEngine');
-const { isWithinOperatingHours, getOutOfHoursNotice } = require('../lib/businessHours');
+const { findBestAnswer, CONFIDENCE_THRESHOLD, recordMatchUsage, recordUnansweredQuery } = require('../lib/knowledgeEngine');
+const { isWithinOperatingHours, getOutOfHoursNotice, isSilentHours } = require('../lib/businessHours');
 
 // PENTING: arahkan folder ini ke Railway Volume (lihat README) supaya
 // sesi login WhatsApp tidak hilang setiap kali service di-redeploy.
@@ -169,12 +169,20 @@ async function processMessage(phone, rawText) {
   const text = rawText.trim();
   if (!text) return null;
 
-  const { match, confidence, ambiguous } = await findBestAnswer(text);
+  const { match, confidence } = await findBestAnswer(text);
 
-  // Tidak yakin / tidak ketemu / ambigu -> diam sama sekali, tidak kirim apa-apa.
-  if (!match || confidence < CONFIDENCE_THRESHOLD || ambiguous) {
+  // Tidak yakin / tidak ketemu -> diam sama sekali, tidak kirim apa-apa.
+  // Tetap dicatat ke log supaya admin bisa lihat pola pertanyaan yang
+  // gagal dijawab dan menambah knowledge berdasarkan data nyata.
+  if (!match || confidence < CONFIDENCE_THRESHOLD) {
+    const reason = !match ? 'no_match' : 'low_confidence';
+    recordUnansweredQuery(phone, text, reason);
     return null;
   }
+
+  // Catat knowledge ini "menang" -- dipakai untuk popularity bonus
+  // di pencarian berikutnya (fire-and-forget, tidak nambah latency).
+  recordMatchUsage(match.id);
 
   return match.content;
 }
@@ -196,6 +204,12 @@ function getTodayWITA() {
  * per hari, tidak diulang-ulang tiap pesan.
  */
 async function processMessageWithHoursNotice(phone, rawText) {
+  // Jam sunyi total (22.00–07.00 WITA) -> bot tidak menjawab apapun,
+  // tidak diproses sama sekali, tidak ada notice, benar-benar diam.
+  if (isSilentHours()) {
+    return null;
+  }
+
   const reply = await processMessage(phone, rawText);
 
   if (!reply) return reply; // tetap diam kalau memang tidak ada jawaban

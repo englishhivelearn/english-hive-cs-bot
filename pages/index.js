@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 
 export default function AdminDashboard() {
-  const [tab, setTab] = useState('knowledge'); // 'knowledge' | 'categories'
+  const [tab, setTab] = useState('knowledge'); // 'knowledge' | 'categories' | 'unanswered'
   const [knowledge, setKnowledge] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [unanswered, setUnanswered] = useState([]);
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState(null); // { message, type }
 
@@ -24,12 +25,14 @@ export default function AdminDashboard() {
   }
 
   async function loadData() {
-    const [kRes, cRes] = await Promise.all([
+    const [kRes, cRes, uRes] = await Promise.all([
       fetch('/api/knowledge'),
       fetch('/api/knowledge/categories'),
+      fetch('/api/unanswered?resolved=false'),
     ]);
     setKnowledge(await kRes.json());
     setCategories(await cRes.json());
+    setUnanswered(await uRes.json());
   }
 
   useEffect(() => { loadData(); }, []);
@@ -162,6 +165,36 @@ export default function AdminDashboard() {
     loadData();
   }
 
+  async function handleResolveUnanswered(id) {
+    await fetch('/api/unanswered', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, resolved: true }),
+    });
+    notify('Ditandai sudah ditindaklanjuti');
+    loadData();
+  }
+
+  async function handleDeleteUnanswered(id) {
+    await fetch(`/api/unanswered?id=${id}`, { method: 'DELETE' });
+    loadData();
+  }
+
+  function handleCreateFromQuery(query) {
+    setTab('knowledge');
+    setShowForm(true);
+    setEditingId(null);
+    setForm({
+      title: '',
+      content: '',
+      categoryId: '',
+      keywords: query.message,
+      requiredGroups: '',
+      excludeKeywords: '',
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   return (
     <div className="shell">
       <div className="topbar">
@@ -177,6 +210,9 @@ export default function AdminDashboard() {
         </button>
         <button className={`tab ${tab === 'categories' ? 'active' : ''}`} onClick={() => setTab('categories')}>
           Kategori ({categories.length})
+        </button>
+        <button className={`tab ${tab === 'unanswered' ? 'active' : ''}`} onClick={() => setTab('unanswered')}>
+          Belum Terjawab ({unanswered.length})
         </button>
       </div>
 
@@ -335,6 +371,38 @@ export default function AdminDashboard() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {tab === 'unanswered' && (
+        <div className="card">
+          <h3>Pertanyaan Belum Terjawab</h3>
+          <p className="hint" style={{ marginBottom: 16 }}>
+            Pesan yang gagal dijawab bot (tidak match / ambigu). Cek pola pertanyaan asli
+            customer di sini, lalu buatkan knowledge baru berdasarkan bahasa mereka sendiri.
+          </p>
+
+          {unanswered.length === 0 && (
+            <div className="empty">🎉 Tidak ada pertanyaan yang belum terjawab saat ini.</div>
+          )}
+
+          {unanswered.map((q) => (
+            <div className="k-item" key={q.id}>
+              <div className="k-item-head">
+                <div>
+                  <div className="k-title">"{q.message}"</div>
+                  <p className="hint" style={{ marginTop: 4 }}>
+                    {new Date(q.createdAt).toLocaleString('id-ID')} · {q.reason === 'no_match' ? 'Tidak ketemu' : 'Confidence rendah'}
+                  </p>
+                </div>
+                <div className="btn-row" style={{ margin: 0, flexShrink: 0 }}>
+                  <button className="btn-primary" onClick={() => handleCreateFromQuery(q)}>Buat Knowledge</button>
+                  <button className="secondary" onClick={() => handleResolveUnanswered(q.id)}>Selesai</button>
+                  <button className="danger" onClick={() => handleDeleteUnanswered(q.id)}>Hapus</button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

@@ -33,6 +33,10 @@ model Knowledge {
   // Mis: ["pindah","ganti","reschedule"] untuk knowledge "Info Jadwal"
   // supaya tidak salah nyantol ke pertanyaan reschedule.
   excludeKeywords Json?
+  // Berapa kali knowledge ini pernah "menang" dipilih sebagai jawaban.
+  // Dipakai sebagai bonus kecil (tie-breaker) saat skor antar-entry
+  // berdekatan -- entry yang lebih sering relevan sedikit diprioritaskan.
+  matchCount      Int                @default(0)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
@@ -56,4 +60,21 @@ model ConversationSession {
   updatedAt DateTime @updatedAt
 
   @@map("conversation_sessions")
+}
+
+// Log pertanyaan yang GAGAL dijawab bot (tidak match / confidence rendah /
+// ambigu). Admin bisa review di dashboard untuk tahu pola pertanyaan asli
+// customer dan menambah/perbaiki knowledge base berdasarkan data nyata,
+// bukan tebakan -- inilah "belajar" yang dilakukan sistem ini: bukan AI,
+// tapi feedback loop berbasis data pemakaian nyata.
+model UnansweredQuery {
+  id         Int      @id @default(autoincrement())
+  phone      String
+  message    String
+  reason     String   // "no_match" | "ambiguous" | "low_confidence"
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([resolved])
+  @@map("unanswered_queries")
 }
