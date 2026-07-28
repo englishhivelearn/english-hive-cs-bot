@@ -37,6 +37,11 @@ model Knowledge {
   // Dipakai sebagai bonus kecil (tie-breaker) saat skor antar-entry
   // berdekatan -- entry yang lebih sering relevan sedikit diprioritaskan.
   matchCount      Int                @default(0)
+  // Threshold confidence KHUSUS untuk knowledge ini (override default
+  // global). Kosongkan (null) untuk pakai default. Knowledge sensitif
+  // (harga, kontrak) sebaiknya diisi lebih TINGGI (mis. 0.55) supaya
+  // lebih hati-hati; knowledge "aman" bisa dibiarkan default/rendah.
+  minConfidence   Float?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 

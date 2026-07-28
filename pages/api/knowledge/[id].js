@@ -20,6 +20,7 @@ export default async function handler(req, res) {
       keywords = [],
       requiredGroups = [],
       excludeKeywords = [],
+      minConfidence,
     } = req.body;
 
     await prisma.knowledgeKeyword.deleteMany({ where: { knowledgeId: id } });
@@ -32,6 +33,10 @@ export default async function handler(req, res) {
         categoryId: Number(categoryId),
         requiredGroups: requiredGroups.length ? requiredGroups : null,
         excludeKeywords: excludeKeywords.length ? excludeKeywords : null,
+        minConfidence:
+          minConfidence !== undefined && minConfidence !== null && minConfidence !== ''
+            ? Number(minConfidence)
+            : null,
         keywords: {
           create: keywords
             .filter((k) => k && k.trim())

@@ -10,7 +10,7 @@ export default function AdminDashboard() {
 
   const [form, setForm] = useState({
     title: '', content: '', categoryId: '', keywords: '',
-    requiredGroups: '', excludeKeywords: '',
+    requiredGroups: '', excludeKeywords: '', minConfidence: '',
   });
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -48,7 +48,7 @@ export default function AdminDashboard() {
   }, [knowledge, search]);
 
   function resetForm() {
-    setForm({ title: '', content: '', categoryId: '', keywords: '', requiredGroups: '', excludeKeywords: '' });
+    setForm({ title: '', content: '', categoryId: '', keywords: '', requiredGroups: '', excludeKeywords: '', minConfidence: '' });
     setEditingId(null);
     setShowForm(false);
   }
@@ -70,6 +70,7 @@ export default function AdminDashboard() {
       keywords: form.keywords.split(',').map((k) => k.trim()).filter(Boolean),
       requiredGroups,
       excludeKeywords,
+      minConfidence: form.minConfidence.trim() === '' ? null : Number(form.minConfidence),
     };
 
     const url = editingId ? `/api/knowledge/${editingId}` : '/api/knowledge';
@@ -102,6 +103,7 @@ export default function AdminDashboard() {
       requiredGroups: Array.isArray(item.requiredGroups)
         ? item.requiredGroups.map((g) => g.join(', ')).join('\n') : '',
       excludeKeywords: Array.isArray(item.excludeKeywords) ? item.excludeKeywords.join(', ') : '',
+      minConfidence: typeof item.minConfidence === 'number' ? String(item.minConfidence) : '',
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -275,6 +277,22 @@ export default function AdminDashboard() {
                 />
                 <p className="hint">Kalau kata ini muncul di pesan user, knowledge ini otomatis di-skip.</p>
 
+                <label className="field-label">Threshold Khusus (opsional)</label>
+                <input
+                  type="number"
+                  step="0.05"
+                  min="0"
+                  max="1"
+                  placeholder="Kosongkan untuk pakai default (0.35)"
+                  value={form.minConfidence}
+                  onChange={(e) => setForm({ ...form, minConfidence: e.target.value })}
+                />
+                <p className="hint">
+                  Makin tinggi = bot makin hati-hati (butuh lebih yakin sebelum jawab).
+                  Cocok untuk knowledge sensitif seperti harga/kontrak (isi 0.5–0.6).
+                  Biarkan kosong untuk knowledge biasa.
+                </p>
+
                 <div className="btn-row">
                   <button type="submit">{editingId ? 'Simpan Perubahan' : 'Tambah Knowledge'}</button>
                   <button type="button" className="secondary" onClick={resetForm}>Batal</button>
@@ -313,6 +331,11 @@ export default function AdminDashboard() {
                 {item.keywords.map((k) => (
                   <span className="tag tag-kw" key={k.id}>{k.keyword}</span>
                 ))}
+                {typeof item.minConfidence === 'number' && (
+                  <span className="tag" style={{ background: '#e0e7ff', color: '#3730a3' }}>
+                    Threshold: {item.minConfidence}
+                  </span>
+                )}
               </div>
               {Array.isArray(item.requiredGroups) && item.requiredGroups.length > 0 && (
                 <div className="tag-row">
