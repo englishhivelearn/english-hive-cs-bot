@@ -5,6 +5,7 @@ export default function AdminDashboard() {
   const [knowledge, setKnowledge] = useState([]);
   const [categories, setCategories] = useState([]);
   const [unanswered, setUnanswered] = useState([]);
+  const [allUnansweredCount, setAllUnansweredCount] = useState({ total: 0, resolved: 0 });
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState(null); // { message, type }
 
@@ -29,14 +30,21 @@ export default function AdminDashboard() {
   }
 
   async function loadData() {
-    const [kRes, cRes, uRes] = await Promise.all([
+    const [kRes, cRes, uRes, allURes] = await Promise.all([
       fetch('/api/knowledge'),
       fetch('/api/knowledge/categories'),
       fetch('/api/unanswered?resolved=false'),
+      fetch('/api/unanswered'),
     ]);
     setKnowledge(await kRes.json());
     setCategories(await cRes.json());
     setUnanswered(await uRes.json());
+
+    const all = await allURes.json();
+    setAllUnansweredCount({
+      total: all.length,
+      resolved: all.filter((q) => q.resolved).length,
+    });
   }
 
   useEffect(() => { loadData(); }, []);
@@ -50,6 +58,20 @@ export default function AdminDashboard() {
       k.keywords.some((kw) => kw.keyword.toLowerCase().includes(q))
     );
   }, [knowledge, search]);
+
+  const stats = useMemo(() => {
+    const totalAnswered = knowledge.reduce((sum, k) => sum + (k.matchCount || 0), 0);
+    const topKnowledge = [...knowledge]
+      .filter((k) => k.matchCount > 0)
+      .sort((a, b) => b.matchCount - a.matchCount)
+      .slice(0, 5);
+    const maxCount = topKnowledge[0]?.matchCount || 1;
+
+    const totalQuestions = totalAnswered + allUnansweredCount.total;
+    const successRate = totalQuestions > 0 ? Math.round((totalAnswered / totalQuestions) * 100) : 0;
+
+    return { totalAnswered, topKnowledge, maxCount, successRate, totalQuestions };
+  }, [knowledge, allUnansweredCount]);
 
   function resetForm() {
     setForm({ title: '', content: '', categoryId: '', keywords: '', requiredGroups: '', excludeKeywords: '', minConfidence: '' });
@@ -245,6 +267,9 @@ export default function AdminDashboard() {
         </button>
         <button className={`tab ${tab === 'test' ? 'active' : ''}`} onClick={() => setTab('test')}>
           🧪 Test Bot
+        </button>
+        <button className={`tab ${tab === 'stats' ? 'active' : ''}`} onClick={() => setTab('stats')}>
+          📊 Statistik
         </button>
       </div>
 
@@ -515,6 +540,65 @@ export default function AdminDashboard() {
             </div>
           )}
         </div>
+      )}
+
+      {tab === 'stats' && (
+        <>
+          <div className="row" style={{ marginBottom: 16 }}>
+            <div className="card" style={{ flex: 1, textAlign: 'center', marginBottom: 0 }}>
+              <div style={{ fontSize: 28, fontWeight: 800, fontFamily: 'Sora, sans-serif', color: '#15803d' }}>
+                {stats.totalQuestions}
+              </div>
+              <p className="hint">Total pertanyaan masuk</p>
+            </div>
+            <div className="card" style={{ flex: 1, textAlign: 'center', marginBottom: 0 }}>
+              <div style={{ fontSize: 28, fontWeight: 800, fontFamily: 'Sora, sans-serif', color: '#15803d' }}>
+                {stats.successRate}%
+              </div>
+              <p className="hint">Tingkat berhasil dijawab</p>
+            </div>
+            <div className="card" style={{ flex: 1, textAlign: 'center', marginBottom: 0 }}>
+              <div style={{ fontSize: 28, fontWeight: 800, fontFamily: 'Sora, sans-serif', color: '#dc2626' }}>
+                {unanswered.length}
+              </div>
+              <p className="hint">Belum ditindaklanjuti</p>
+            </div>
+          </div>
+
+          <div className="card">
+            <h3>Knowledge Paling Sering Dijawab</h3>
+            {stats.topKnowledge.length === 0 && (
+              <div className="empty">Belum ada data. Statistik akan muncul setelah bot mulai menjawab pesan.</div>
+            )}
+            {stats.topKnowledge.map((k) => (
+              <div key={k.id} style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, marginBottom: 4 }}>
+                  <strong style={{ color: 'var(--navy)' }}>{k.title}</strong>
+                  <span className="hint">{k.matchCount}x</span>
+                </div>
+                <div style={{ background: '#f0f0f0', borderRadius: 999, height: 8, overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      width: `${Math.max((k.matchCount / stats.maxCount) * 100, 4)}%`,
+                      background: 'linear-gradient(90deg, #16a34a, #15803d)',
+                      height: '100%',
+                      borderRadius: 999,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="card">
+            <h3>Log Pertanyaan Gagal</h3>
+            <p className="hint">
+              Total sepanjang waktu: <strong>{allUnansweredCount.total}</strong> pertanyaan gagal dijawab,
+              {' '}<strong>{allUnansweredCount.resolved}</strong> di antaranya sudah ditindaklanjuti
+              ({allUnansweredCount.total > 0 ? Math.round((allUnansweredCount.resolved / allUnansweredCount.total) * 100) : 0}%).
+            </p>
+          </div>
+        </>
       )}
 
       {toast && <div className={`toast ${toast.type === 'error' ? 'error' : ''}`}>{toast.message}</div>}
