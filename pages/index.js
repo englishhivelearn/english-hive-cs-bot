@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 
 export default function AdminDashboard() {
-  const [tab, setTab] = useState('knowledge'); // 'knowledge' | 'categories' | 'unanswered'
+  const [tab, setTab] = useState('knowledge'); // 'knowledge' | 'categories' | 'unanswered' | 'test'
   const [knowledge, setKnowledge] = useState([]);
   const [categories, setCategories] = useState([]);
   const [unanswered, setUnanswered] = useState([]);
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState(null); // { message, type }
+
+  const [testQuery, setTestQuery] = useState('');
+  const [testResult, setTestResult] = useState(null);
+  const [testLoading, setTestLoading] = useState(false);
 
   const [form, setForm] = useState({
     title: '', content: '', categoryId: '', keywords: '',
@@ -193,8 +197,31 @@ export default function AdminDashboard() {
       keywords: query.message,
       requiredGroups: '',
       excludeKeywords: '',
+      minConfidence: '',
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function handleTestBot(e) {
+    e.preventDefault();
+    if (!testQuery.trim()) return;
+
+    setTestLoading(true);
+    setTestResult(null);
+
+    try {
+      const res = await fetch('/api/test-bot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: testQuery }),
+      });
+      const data = await res.json();
+      setTestResult(data);
+    } catch (err) {
+      notify('Gagal menjalankan test', 'error');
+    } finally {
+      setTestLoading(false);
+    }
   }
 
   return (
@@ -215,6 +242,9 @@ export default function AdminDashboard() {
         </button>
         <button className={`tab ${tab === 'unanswered' ? 'active' : ''}`} onClick={() => setTab('unanswered')}>
           Belum Terjawab ({unanswered.length})
+        </button>
+        <button className={`tab ${tab === 'test' ? 'active' : ''}`} onClick={() => setTab('test')}>
+          🧪 Test Bot
         </button>
       </div>
 
@@ -426,6 +456,64 @@ export default function AdminDashboard() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {tab === 'test' && (
+        <div className="card">
+          <h3>Test Bot</h3>
+          <p className="hint" style={{ marginBottom: 16 }}>
+            Simulasikan pertanyaan seperti dari WhatsApp, lihat knowledge mana yang
+            kepilih dan skor confidence-nya -- tanpa perlu kirim pesan WhatsApp beneran.
+          </p>
+
+          <form onSubmit={handleTestBot} className="row">
+            <input
+              placeholder='Ketik pertanyaan test, mis. "jadwal kelas hari apa"'
+              value={testQuery}
+              onChange={(e) => setTestQuery(e.target.value)}
+            />
+            <button type="submit" disabled={testLoading}>
+              {testLoading ? 'Menguji...' : 'Test'}
+            </button>
+          </form>
+
+          {testResult && (
+            <div style={{ marginTop: 20 }}>
+              <div className="k-item" style={{ borderColor: testResult.matched ? '#16a34a' : '#dc2626' }}>
+                <div className="k-item-head">
+                  <div className="k-title">
+                    {testResult.matched ? '✅ Match ditemukan' : '❌ Tidak ada yang match'}
+                  </div>
+                  <span
+                    className="tag"
+                    style={{
+                      background: testResult.matched ? '#ecfdf3' : '#fef2f2',
+                      color: testResult.matched ? '#15803d' : '#b91c1c',
+                    }}
+                  >
+                    Confidence: {testResult.confidence} (threshold: {testResult.knowledge?.minConfidence ?? testResult.threshold})
+                  </span>
+                </div>
+
+                {testResult.knowledge && (
+                  <>
+                    <p className="hint" style={{ fontSize: 13, marginTop: 8 }}>
+                      Knowledge: <strong>{testResult.knowledge.title}</strong> ({testResult.knowledge.category})
+                    </p>
+                    <div className="k-content">{testResult.knowledge.content}</div>
+                  </>
+                )}
+
+                {!testResult.matched && (
+                  <p className="hint" style={{ marginTop: 8 }}>
+                    Bot akan diam untuk pesan ini di WhatsApp asli. Coba perbaiki keyword/AND-group
+                    di knowledge yang seharusnya menjawab pertanyaan ini.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
