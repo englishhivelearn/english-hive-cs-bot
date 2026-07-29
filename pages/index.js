@@ -246,6 +246,19 @@ export default function AdminDashboard() {
     }
   }
 
+  async function handleResetStats(target, label) {
+    if (!confirm(`Reset ${label}? Data yang sudah dihapus tidak bisa dikembalikan.`)) return;
+
+    await fetch('/api/reset-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target }),
+    });
+
+    notify(`${label} berhasil direset`);
+    loadData();
+  }
+
   return (
     <div className="shell">
       <div className="topbar">
@@ -597,6 +610,25 @@ export default function AdminDashboard() {
               {' '}<strong>{allUnansweredCount.resolved}</strong> di antaranya sudah ditindaklanjuti
               ({allUnansweredCount.total > 0 ? Math.round((allUnansweredCount.resolved / allUnansweredCount.total) * 100) : 0}%).
             </p>
+          </div>
+
+          <div className="card">
+            <h3>⚠️ Reset Data Statistik</h3>
+            <p className="hint" style={{ marginBottom: 14 }}>
+              Tindakan ini permanen dan tidak bisa dibatalkan. Knowledge base (judul, isi,
+              keyword) TIDAK akan terhapus -- hanya angka statistiknya saja yang direset ke 0.
+            </p>
+            <div className="btn-row" style={{ flexWrap: 'wrap' }}>
+              <button className="danger" onClick={() => handleResetStats('matchCount', 'Statistik "sering dijawab"')}>
+                Reset Popularitas Knowledge
+              </button>
+              <button className="danger" onClick={() => handleResetStats('unanswered', 'Log pertanyaan gagal')}>
+                Reset Log Pertanyaan Gagal
+              </button>
+              <button className="danger" onClick={() => handleResetStats('all', 'SEMUA statistik')}>
+                Reset Semua Statistik
+              </button>
+            </div>
           </div>
         </>
       )}
